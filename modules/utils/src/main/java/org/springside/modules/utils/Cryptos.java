@@ -5,16 +5,27 @@
  *******************************************************************************/
 package org.springside.modules.utils;
 
-import java.security.GeneralSecurityException;
-import java.security.SecureRandom;
-import java.util.Arrays;
-
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.DESKeySpec;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.security.GeneralSecurityException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Arrays;
 
 /**
  * 支持HMAC-SHA1消息签名 及 DES/AES对称加密的工具类.
@@ -26,11 +37,14 @@ import javax.crypto.spec.SecretKeySpec;
 public class Cryptos {
 
 	private static final String AES = "AES";
+	private static final String DES = "DES";
 	private static final String AES_CBC = "AES/CBC/PKCS5Padding";
+	private static final String DES_ECB = "DES/ECB/PKCS5Padding";
 	private static final String HMACSHA1 = "HmacSHA1";
 
 	private static final int DEFAULT_HMACSHA1_KEYSIZE = 160; // RFC2401
 	private static final int DEFAULT_AES_KEYSIZE = 128;
+	private static final int DEFAULT_DES_KEYSIZE = 56;
 	private static final int DEFAULT_IVSIZE = 16;
 
 	private static SecureRandom random = new SecureRandom();
@@ -103,6 +117,25 @@ public class Cryptos {
 	}
 
 	/**
+	 * DES 加密
+	 * @param data, 原始数据, 字节数组形式
+	 * @param key, 原始密钥, 字节数组
+	 * @return 加密后数据, 字节数组形式
+	 */
+	public static byte[] desEncrypt(byte[] data, byte[] key) {
+		// 还原二进制密钥为密钥对象
+		Key k = generateDesKey(key);
+		try {
+			// 初始化, 设置为加密模式
+			Cipher cipher = Cipher.getInstance(DES_ECB);
+			cipher.init(Cipher.ENCRYPT_MODE, k);
+			return cipher.doFinal(data);
+		} catch (NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException e) {
+			throw Exceptions.unchecked(e);
+		}
+	}
+
+	/**
 	 * 使用AES解密字符串, 返回原始字符串.
 	 * 
 	 * @param input Hex编码的加密字符串
@@ -111,6 +144,25 @@ public class Cryptos {
 	public static String aesDecrypt(byte[] input, byte[] key) {
 		byte[] decryptResult = aes(input, key, Cipher.DECRYPT_MODE);
 		return new String(decryptResult);
+	}
+
+	/**
+	 * DES解密
+	 * @param data 待解密数据, 字节数组
+	 * @param key 密钥, 字节数组
+	 * @return 解密后数据字节数组
+	 */
+	public static byte[] desDecrypt(byte[] data, byte[] key) {
+		// 还原二进制密钥为密钥对象
+		Key k = generateDesKey(key);
+		try {
+			// 初始化, 设置为解密模式
+			Cipher cipher = Cipher.getInstance(DES_ECB);
+			cipher.init(Cipher.DECRYPT_MODE, k);
+			return cipher.doFinal(data);
+		} catch (NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException | InvalidKeyException | NoSuchPaddingException e) {
+			throw Exceptions.unchecked(e);
+		}
 	}
 
 	/**
@@ -171,6 +223,14 @@ public class Cryptos {
 	}
 
 	/**
+	 * 生成Des密钥, 返回字节数组, 默认长度为56位
+	 * @return
+	 */
+	public static byte[] generateDesKey() {
+		return generateDesKey(DEFAULT_DES_KEYSIZE);
+	}
+
+	/**
 	 * 生成AES密钥,可选长度为128,192,256位.
 	 */
 	public static byte[] generateAesKey(int keysize) {
@@ -182,6 +242,108 @@ public class Cryptos {
 		} catch (GeneralSecurityException e) {
 			throw Exceptions.unchecked(e);
 		}
+	}
+
+	/**
+	 * 生成DES 密钥, 支持56位密钥, 64位密钥需要BC包支持:
+	 * 56 KeyGenerator.getInstance(DES);
+	 * 64 KeyGenerator.getInstance(DES, "BC");
+	 * @param keysize 密钥长度
+	 * @return
+	 */
+	public static byte[] generateDesKey(int keysize) {
+		try {
+			KeyGenerator keyGenerator = KeyGenerator.getInstance(DES);
+			keyGenerator.init(keysize);
+			SecretKey secretKey = keyGenerator.generateKey();
+			return secretKey.getEncoded();
+		} catch (NoSuchAlgorithmException e) {
+			throw Exceptions.unchecked(e);
+		}
+	}
+
+	/**
+	 * 将二进制DES密钥转化为密钥材料对象
+	 * @param key 密钥对象
+	 * @return 密钥对象
+	 */
+	public static Key generateDesKey(byte[] key)  {
+		try {
+			// 实例化密钥材料
+			DESKeySpec desKeySpec = new DESKeySpec(key);
+			// 实例化密钥工厂
+			SecretKeyFactory keyFactory = SecretKeyFactory.getInstance(DES);
+			// 生成密钥
+			return keyFactory.generateSecret(desKeySpec);
+		} catch (InvalidKeyException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+			throw Exceptions.unchecked(e);
+		}
+	}
+
+	private static final String PBE_WITH_MD5_AND_DES = "PBEWITHMD5andDES";
+	/**
+	 * 根据用户提供的密码构建PBE密钥
+	 * @param password
+	 * @return
+	 */
+	public static SecretKey generatePBEKey(String password) {
+		PBEKeySpec pbeKeySpec = new PBEKeySpec(password.toCharArray());
+		try {
+			SecretKeyFactory keyFactory = SecretKeyFactory.getInstance(PBE_WITH_MD5_AND_DES);
+			return keyFactory.generateSecret(pbeKeySpec);
+
+		} catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+			throw Exceptions.unchecked(e);
+		}
+	}
+
+	/**
+	 * PBE加密
+	 * @param data
+	 * @param password
+	 * @param salt
+	 * @return
+	 */
+	public static byte[] pbeEncrypt(byte[] data, String password, byte[] salt) {
+		SecretKey secretKey = generatePBEKey(password);
+		PBEParameterSpec pbeParameterSpec = new PBEParameterSpec(salt, 10);
+		try {
+			Cipher cipher = Cipher.getInstance(PBE_WITH_MD5_AND_DES);
+			cipher.init(Cipher.ENCRYPT_MODE, secretKey, pbeParameterSpec);
+			return cipher.doFinal(data);
+		} catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | IllegalBlockSizeException | InvalidKeyException | BadPaddingException | NoSuchPaddingException e) {
+			throw Exceptions.unchecked(e);
+		}
+	}
+
+	/**
+	 * PBE解密
+	 * @param data
+	 * @param password
+	 * @param salt
+	 * @return
+	 */
+	public static byte[] pbeDecrypt(byte[] data, String password, byte[] salt) {
+		SecretKey secretKey = generatePBEKey(password);
+		PBEParameterSpec pbeParameterSpec = new PBEParameterSpec(salt, 10);
+		try {
+			Cipher cipher = Cipher.getInstance(PBE_WITH_MD5_AND_DES);
+			cipher.init(Cipher.DECRYPT_MODE, secretKey, pbeParameterSpec);
+			return cipher.doFinal(data);
+		} catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | IllegalBlockSizeException | InvalidKeyException | BadPaddingException | NoSuchPaddingException e) {
+			throw Exceptions.unchecked(e);
+		}
+	}
+
+
+	/**
+	 * 随机盐
+	 * @param len
+	 * @return
+	 */
+	public static byte[] randomSalt(int len) {
+		SecureRandom secureRandom = new SecureRandom();
+		return random.generateSeed(len);
 	}
 
 	/**

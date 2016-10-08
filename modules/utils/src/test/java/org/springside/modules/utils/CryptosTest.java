@@ -5,11 +5,9 @@
  *******************************************************************************/
 package org.springside.modules.utils;
 
-import static org.assertj.core.api.Assertions.*;
-
 import org.junit.Test;
-import org.springside.modules.utils.Cryptos;
-import org.springside.modules.utils.Encodes;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class CryptosTest {
 	@Test
@@ -36,10 +34,46 @@ public class CryptosTest {
 
 		byte[] encryptResult = Cryptos.aesEncrypt(input.getBytes(), key);
 		String descryptResult = Cryptos.aesDecrypt(encryptResult, key);
+		System.out.println(descryptResult);
 
 		System.out.println("aes key in hex            :" + Encodes.encodeHex(key));
 		System.out.println("aes encrypt in hex result :" + Encodes.encodeHex(encryptResult));
 		assertThat(descryptResult).isEqualTo(input);
+	}
+
+	@Test
+	public void des() {
+		byte[] desKey = Cryptos.generateDesKey();
+		System.out.println("des 密钥: " + Encodes.encodeHex(desKey));
+
+		String message = "hello human!";
+		System.out.println("原始消息 : " + message);
+
+		byte[] encrypt = Cryptos.desEncrypt(message.getBytes(), desKey);
+		System.out.println("DES加密后消息 : " + Encodes.encodeHex(encrypt));
+
+		byte[] decrypt = Cryptos.desDecrypt(encrypt, desKey);
+		System.out.println("DES解密后消息 : " + Encodes.encodeHex(decrypt));
+		System.out.println("DES 解密结果 : " + new String(decrypt));
+	}
+
+	@Test
+	public void pbe() {
+		byte[] salt = Cryptos.randomSalt(8);
+		String password = "115190";
+		String password2 = "1151900";
+		String message = "Hello Galaxy!";
+
+		byte[] encrypt = Cryptos.pbeEncrypt(message.getBytes(), password, salt);
+		System.out.println("PBE 加密数据 : " + Encodes.encodeHex(encrypt));
+
+		byte[] decrypt = Cryptos.pbeDecrypt(encrypt, password, salt);
+		System.out.println("PBE 解密数据 : " + Encodes.encodeHex(decrypt));
+		System.out.println("PBE 解密数据 : " + new String(decrypt));
+
+		byte[] decrypt2 = Cryptos.pbeDecrypt(encrypt, password2, salt);
+		System.out.println("PBE 解密数据 : " + Encodes.encodeHex(decrypt2));
+		System.out.println("PBE 解密数据 : " + new String(decrypt2));
 	}
 
 	@Test

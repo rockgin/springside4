@@ -5,27 +5,66 @@
  *******************************************************************************/
 package org.springside.modules.utils;
 
+import org.junit.Test;
+
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.junit.Test;
-
 public class DigestsTest {
+
+	private static final String SHA256 = "SHA-256";
+	private static final String SHA512 = "SHA-512";
 
 	@Test
 	public void digestString() {
 		String input = "user";
-		byte[] sha1Result = Digests.sha1(input.getBytes());
-		System.out.println("sha1 in hex result                               :" + Encodes.encodeHex(sha1Result));
+		byte[] shaResult = Digests.sha1(input.getBytes());
+		System.out.println("sha1 in hex result                               :" + Encodes.encodeHex(shaResult));
+
+		shaResult = Digests.sha2(input.getBytes(), SHA256);
+		System.out.println("sha2 in hex result                               :" + Encodes.encodeHex(shaResult));
+
 
 		byte[] salt = Digests.generateSalt(8);
 		System.out.println("salt in hex                                      :" + Encodes.encodeHex(salt));
-		sha1Result = Digests.sha1(input.getBytes(), salt);
-		System.out.println("sha1 in hex result with salt                     :" + Encodes.encodeHex(sha1Result));
 
-		sha1Result = Digests.sha1(input.getBytes(), salt, 1024);
-		System.out.println("sha1 in hex result with salt and 1024 interations:" + Encodes.encodeHex(sha1Result));
+		shaResult = Digests.sha1(input.getBytes(), salt);
+		System.out.println("sha1 in hex result with salt                     :" + Encodes.encodeHex(shaResult));
 
+		shaResult = Digests.sha2(input.getBytes(), salt, SHA256);
+		System.out.println("sha2 in hex result with salt                     :" + Encodes.encodeHex(shaResult));
+
+
+		shaResult = Digests.sha1(input.getBytes(), salt, 1024);
+		System.out.println("sha1 in hex result with salt and 1024 interations:" + Encodes.encodeHex(shaResult));
+
+		shaResult = Digests.sha2(input.getBytes(), salt, 1024, SHA256);
+		System.out.println("sha2 in hex result with salt and 1024 interations:" + Encodes.encodeHex(shaResult));
+
+	}
+
+	@Test
+	public void testHmac() throws Exception {
+		String msg = "hmac 测试";
+		Digests.HmacAlgorithm algorithm = Digests.HmacAlgorithm.HMAC_MD5;
+
+		byte[] hmacKey = Digests.HMAC.initHmacKey(algorithm);
+		byte[] data00 = Digests.HMAC.hmacMD5(msg.getBytes(), hmacKey);
+		byte[] data01 = Digests.HMAC.hmacMD5(msg.getBytes(), hmacKey);
+		System.out.println(Encodes.encodeHex(data00));
+		System.out.println(Encodes.encodeHex(data01));
+
+		byte[] data10 = Digests.HMAC.hmacSHA1(msg.getBytes(), hmacKey);
+		byte[] data11 = Digests.HMAC.hmacSHA1(msg.getBytes(), hmacKey);
+		System.out.println(Encodes.encodeHex(data10));
+		System.out.println(Encodes.encodeHex(data11));
+
+		byte[] data20 = Digests.HMAC.hmacSHA2(msg.getBytes(), hmacKey, Digests.HmacAlgorithm.HMAC_SHA256);
+		byte[] data21 = Digests.HMAC.hmacSHA2(msg.getBytes(), hmacKey, Digests.HmacAlgorithm.HMAC_SHA384);
+		byte[] data22 = Digests.HMAC.hmacSHA2(msg.getBytes(), hmacKey, Digests.HmacAlgorithm.HMAC_SHA512);
+		System.out.println(Encodes.encodeHex(data20));
+		System.out.println(Encodes.encodeHex(data21));
+		System.out.println(Encodes.encodeHex(data22));
 	}
 
 	@Test

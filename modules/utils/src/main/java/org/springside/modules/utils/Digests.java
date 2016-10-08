@@ -5,6 +5,14 @@
  *******************************************************************************/
 package org.springside.modules.utils;
 
+import com.google.common.hash.Hashing;
+import org.apache.commons.lang3.Validate;
+import org.springside.modules.constants.Charsets;
+
+import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -12,11 +20,6 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.zip.CRC32;
-
-import org.apache.commons.lang3.Validate;
-import org.springside.modules.constants.Charsets;
-
-import com.google.common.hash.Hashing;
 
 /**
  * 消息摘要的工具类.
@@ -40,12 +43,19 @@ public class Digests {
 	public static byte[] sha1(byte[] input) {
 		return digest(input, SHA1, null, 1);
 	}
+	public static byte[] sha2(byte[] input, String algorithm) {
+		return digest(input, algorithm, null, 1);
+	}
 
 	/**
 	 * 对输入字符串进行sha1散列.
 	 */
 	public static byte[] sha1(String input) {
 		return digest(input.getBytes(Charsets.UTF8), SHA1, null, 1);
+	}
+
+	public static byte[] sha2(String input, String algorithm) {
+		return digest(input.getBytes(Charsets.UTF8), algorithm, null, 1);
 	}
 
 	/**
@@ -58,15 +68,21 @@ public class Digests {
 	/**
 	 * 对输入字符串进行sha1散列，带salt达到更高的安全性.
 	 */
+
 	public static byte[] sha1(byte[] input, byte[] salt) {
 		return digest(input, SHA1, salt, 1);
 	}
-
+	public static byte[] sha2(byte[] input, byte[] salt, String algorithm) {
+		return digest(input, algorithm, salt, 1);
+	}
 	/**
 	 * 对输入字符串进行sha1散列，带salt达到更高的安全性.
 	 */
 	public static byte[] sha1(String input, byte[] salt) {
 		return digest(input.getBytes(Charsets.UTF8), SHA1, salt, 1);
+	}
+	public static byte[] sha2(String input, byte[] salt, String algorithm) {
+		return digest(input.getBytes(Charsets.UTF8), algorithm, salt, 1);
 	}
 
 	/**
@@ -83,11 +99,18 @@ public class Digests {
 		return digest(input, SHA1, salt, iterations);
 	}
 
+	public static byte[] sha2(byte[] input, byte[] salt, int iterations, String algorithm) {
+		return digest(input, algorithm, salt, iterations);
+	}
+
 	/**
 	 * 对输入字符串进行sha1散列，带salt而且迭代达到更高更高的安全性.
 	 */
 	public static byte[] sha1(String input, byte[] salt, int iterations) {
 		return digest(input.getBytes(Charsets.UTF8), SHA1, salt, iterations);
+	}
+	public static byte[] sha2(String input, byte[] salt, int iterations, String algorithm) {
+		return digest(input.getBytes(Charsets.UTF8), algorithm, salt, iterations);
 	}
 
 	/**
@@ -260,4 +283,57 @@ public class Digests {
 	public static int murmur32(String input, Charset charset, int seed) {
 		return Hashing.murmur3_32(seed).hashString(input, charset).asInt();
 	}
+
+	/**
+	 * 加入HMAC 密钥安全散列算法
+	 */
+	public static class HMAC {
+		public static byte[] initHmacKey(HmacAlgorithm algorithm) throws Exception {
+			KeyGenerator keyGenerator = KeyGenerator.getInstance(algorithm.getAlgorithm());
+			SecretKey secretKey = keyGenerator.generateKey();
+			return secretKey.getEncoded();
+		}
+		public static byte[] hmacMD5(byte[] data, byte[] key) throws Exception {
+			SecretKey secretKey = new SecretKeySpec(key, HmacAlgorithm.HMAC_MD5.getAlgorithm());
+			Mac mac = Mac.getInstance(secretKey.getAlgorithm());
+			mac.init(secretKey);
+			return mac.doFinal(data);
+		}
+		public static byte[] hmacSHA1(byte[] data, byte[] key) throws Exception {
+			SecretKey secretKey = new SecretKeySpec(key, HmacAlgorithm.HMAC_SHA1.getAlgorithm());
+			Mac mac = Mac.getInstance(secretKey.getAlgorithm());
+			mac.init(secretKey);
+			return mac.doFinal(data);
+		}
+		public static byte[] hmacSHA2(byte[] data, byte[] key, HmacAlgorithm algorithm) throws Exception {
+			SecretKey secretKey = new SecretKeySpec(key, algorithm.getAlgorithm());
+			Mac mac = Mac.getInstance(secretKey.getAlgorithm());
+			mac.init(secretKey);
+			return mac.doFinal(data);
+		}
+
+	}
+
+	public enum HmacAlgorithm {
+		HMAC_MD5("HmacMD5"),
+		HMAC_SHA1("HmacSHA1"),
+		HMAC_SHA256("HmacSHA256"),
+		HMAC_SHA384("HmacSHA384"),
+		HMAC_SHA512("HmacSHA512");
+		private String algorithm;
+
+		HmacAlgorithm(String algorithm) {
+			this.algorithm = algorithm;
+		}
+
+		public String getAlgorithm() {
+			return algorithm;
+		}
+
+		public void setAlgorithm(String algorithm) {
+			this.algorithm = algorithm;
+		}
+	}
+
+
 }
